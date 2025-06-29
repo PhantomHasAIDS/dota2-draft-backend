@@ -25,6 +25,8 @@ async function fetchMatchups(heroId) {
   try {
     const variables = { heroId };
 
+    console.log(`🔄 Fetching matchup data for heroId: ${heroId}`);
+
     const response = await fetch(STRATZ_API_URL, {
       method: "POST",
       headers: {
@@ -35,7 +37,12 @@ async function fetchMatchups(heroId) {
       body: JSON.stringify({ query: matchupQuery, variables }),
     });
 
+    console.log("📡 STRATZ response status:", response.status);
+
     const json = await response.json();
+
+    console.log("📦 Raw STRATZ data:", JSON.stringify(json).slice(0, 300));
+
     if (json.errors) {
       console.error("GraphQL errors:", json.errors);
       return;
