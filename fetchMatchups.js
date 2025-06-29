@@ -1,5 +1,3 @@
-const fetch = require('node-fetch');
-
 const STRATZ_API_URL = 'https://api.stratz.com/graphql';
 
 async function fetchMatchups(heroId) {
