@@ -106,22 +106,15 @@ app.post("/api/matchups", async (req, res) => {
   }
 });
 
-const currentSelections = {
-  allyHeroIds: [],
-  enemyHeroIds: [],
-  bannedHeroIds: [],
-  matchups: {}
-};
-
 app.post("/api/select-hero", async (req, res) => {
-  const { heroId, team } = req.body;
+  const { heroId, team, allyHeroIds = [], enemyHeroIds = [], matchupCache = {} } = req.body;
 
   if (!heroId || !["ally", "enemy"].includes(team)){
     return res.status(400).json({ error: "heroId and team ('ally' or 'enemy')are  required" });
   }
 
-  const selectionList = team === "ally" ? currentSelections.allyHeroIds : currentSelections.enemyHeroIds;
-  const opposingList = team === "ally" ? currentSelections.enemyHeroIds : currentSelections.allyHeroIds;
+  const selectionList = team === "ally" ? allyHeroIds : enemyHeroIds;
+  const opposingList = team === "ally" ? enemyHeroIds : allyHeroIds;
 
   // Prevent picking a hero that's already picked by the other team
   if (opposingList.includes(heroId)) {
@@ -135,107 +128,46 @@ app.post("/api/select-hero", async (req, res) => {
 
   // Prevent duplicate selection
   if (selectionList.includes(heroId)) {
-    return res.json({ message: "Hero already selected", currentSelections });
+    return res.json({ message: "Hero already selected" });
   }
 
   try {
-    const data = await fetchMatchups(heroId);
-    selectionList.push(heroId);
-    currentSelections.matchups[heroId] = data;
-    res.json({ message: "Hero selected", currentSelections });
+    // Avoid refetching if already cached
+    let matchups = matchupCache[heroId]
+    if (!matchups){
+      matchups = await fetchMatchups(heroId);
+    }
+
+    res.json({ message: "Hero selected",
+      matchups,
+    });
   } catch (err) {
     console.error("Failed to fetch/store matchups:", err);
     res.status(500).json({ error: "Internal Server Error" })
   }
 });
 
-app.post("/api/deselect-hero", async (req, res) => {
-  const { heroId, team } = req.body;
-  if (!heroId || (team !== "ally" && team !== "enemy")) {
-    return res.status(400).json({ error: "heroId and valid team are required" });
-  }
-
-  const teamArray = team === "ally" ? currentSelections.allyHeroIds : currentSelections.enemyHeroIds;
-
-  const index = teamArray.indexOf(heroId);
-  if (index === -1) {
-    return res.status(400).json({ error: "Hero not in selected team" });
-  }
-
-  // Remove hero from the team
-  teamArray.splice(index, 1);
-
-  // Remove matchups related to removed hero
-  const stillUsed = currentSelections.allyHeroIds.includes(heroId) || currentSelections.enemyHeroIds.includes(heroId);
-  if (!stillUsed) {
-    delete currentSelections.matchups[heroId];
-  }
-
-  res.json({ message: "Hero deselected", currentSelections });
-});
-
-app.post("/api/clear", (req, res) => {
-  try {
-    currentSelections.allyHeroIds = [];
-    currentSelections.enemyHeroIds = [];
-    currentSelections.bannedHeroIds = [];
-    currentSelections.matchups = {};
-    res.json({ message: "All selections cleared", currentSelections });
-  } catch (err) {
-    console.error("Failed to clear selections:", err);
-    res.status(500).json({ error: "Failed to clear selections" });
-  }
-});
-
-app.post("/api/ban-hero", async (req, res) => {
-  const { heroId } = req.body;
-  if (!currentSelections.bannedHeroIds) currentSelections.bannedHeroIds = [];
-  if (currentSelections.bannedHeroIds.includes(heroId)) {
-    return res.status(400).json({ message: "Hero already banned" })
-  }
-  
-  try {
-    const data = await fetchMatchups(heroId);
-    currentSelections.bannedHeroIds.push(heroId);
-    currentSelections.matchups[heroId] = data;
-    res.json({ message: "Hero Banned" })
-  } catch (err) {
-    console.error("Failed to fetch/store matchups for banned hero:", err);
-    res.status(500).json({ error: "Failed to ban hero" });
-  }
-});
-
-app.post("/api/unban-hero", (req, res) => {
-  const { heroId } = req.body;
-  const index = currentSelections.bannedHeroIds.indexOf(heroId);
-  if (index !== -1) {
-    currentSelections.bannedHeroIds.splice(index, 1);
-    delete currentSelections.matchups[heroId];
-    return res.json({ message: "Hero unbanned" });
-  }
-  return res.status(400).json({ message: "Hero not found in bans" });
-});
-
-app.get("/api/synergy-picks", async (req, res) => {
+app.post("/api/synergy-picks", async (req, res) => {
+  const { allyHeroIds = [], enemyHeroIds = [], bannedHeroIds = [], matchups = {} } = req.body;
   try {
     const allHeroes = await Hero.find({});
-    const pickedSet = new Set([...currentSelections.allyHeroIds, ...currentSelections.enemyHeroIds, ...currentSelections.bannedHeroIds,]);
+    const pickedSet = new Set([...allyHeroIds, ...enemyHeroIds, ...bannedHeroIds]);
 
     const synergyScores = {};
     const counterScores = {};
 
     // Synergy calculations
-    for (const allyId of currentSelections.allyHeroIds) {
-      const matchups = currentSelections.matchups[allyId]?.with || [];
-      for (const { heroId2, synergy } of matchups) {
+    for (const allyId of allyHeroIds) {
+      const allyMatchups = matchups[allyId]?.with || [];
+      for (const { heroId2, synergy } of allyMatchups) {
         synergyScores[heroId2] = (synergyScores[heroId2] || 0) + synergy;
       }
     }
 
     // Counter calculations
-    for (const enemyId of currentSelections.enemyHeroIds) {
-      const matchups = currentSelections.matchups[enemyId]?.vs || [];
-      for (const { heroId2, synergy } of matchups) {
+    for (const enemyId of enemyHeroIds) {
+      const enemyMatchups = matchups[enemyId]?.vs || [];
+      for (const { heroId2, synergy } of enemyMatchups) {
         counterScores[heroId2] = (counterScores[heroId2] || 0) + synergy;
       }
     }
@@ -243,9 +175,9 @@ app.get("/api/synergy-picks", async (req, res) => {
     // Turn into an array and sort
     const combinedScores = {};
     for (const hero of allHeroes) {
-      const id = hero.HeroId.toString();
+      const id = hero.HeroId;
       const isPicked = pickedSet.has(hero.HeroId);
-      const isBanned = currentSelections.bannedHeroIds?.includes(hero.HeroId);
+      const isBanned = bannedHeroIds?.includes(hero.HeroId);
       if(isPicked || isBanned) continue;
 
       const synergy = synergyScores[id] || 0;
