@@ -154,7 +154,7 @@ app.post("/api/select-hero", async (req, res) => {
 });
 
 app.post("/api/synergy-picks", async (req, res) => {
-  const { allyHeroIds = [], enemyHeroIds = [], bannedHeroIds = [] } = req.body;
+  const { allyHeroIds = [], enemyHeroIds = [], bannedHeroIds = [], roleFilter = null } = req.body;
   try {
     const allHeroes = await Hero.find({});
     const pickedSet = new Set([...allyHeroIds, ...enemyHeroIds, ...bannedHeroIds]);
@@ -182,9 +182,9 @@ app.post("/api/synergy-picks", async (req, res) => {
     const combinedScores = {};
     for (const hero of allHeroes) {
       const id = hero.HeroId;
-      const isPicked = pickedSet.has(hero.HeroId);
-      const isBanned = bannedHeroIds?.includes(hero.HeroId);
-      if(isPicked || isBanned) continue;
+      const isPickedOrBanned = pickedSet.has(id);
+      const roleMismatch = roleFilter && !hero.roles.includes(roleFilter);
+      if(isPickedOrBanned || roleMismatch) continue;
 
       const synergy = synergyScores[id] || 0;
       const counter = counterScores[id] || 0;
