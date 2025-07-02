@@ -30,7 +30,7 @@ async function fetchMatchups(heroId) {
       headers: {
         "Content-Type": "application/json",
         "User-Agent": "STRATZ_API",
-        Authorization: `Bearer ${process.env.SRATZ_API_TOKEN}`,
+        Authorization: `Bearer ${process.env.STRATZ_API_TOKEN}`,
       },
       body: JSON.stringify({ query: matchupQuery, variables }),
     });

@@ -1,14 +1,20 @@
+require("dotenv").config();
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const fetchMatchups = require("./fetchMatchups")
+const fs = require("fs");
+const path = require("path");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Replace this with your real MongoDB connection string
-const MONGO_URI = "mongodb+srv://PhantomHasAIDS:Tomi2002seppojuhani!@dota2counterpicking.o7lyfu7.mongodb.net/?retryWrites=true&w=majority&appName=Dota2Counterpicking";
+const matchupData = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "data", "matchupData.json"), "utf-8")
+);
+
+const MONGO_URI = process.env.MONGO_URI;
 
 mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
@@ -107,7 +113,7 @@ app.post("/api/matchups", async (req, res) => {
 });
 
 app.post("/api/select-hero", async (req, res) => {
-  const { heroId, team, allyHeroIds = [], enemyHeroIds = [], matchupCache = {} } = req.body;
+  const { heroId, team, allyHeroIds = [], enemyHeroIds = [] } = req.body;
 
   if (!heroId || !["ally", "enemy"].includes(team)){
     return res.status(400).json({ error: "heroId and team ('ally' or 'enemy')are  required" });
@@ -132,10 +138,10 @@ app.post("/api/select-hero", async (req, res) => {
   }
 
   try {
-    // Avoid refetching if already cached
-    let matchups = matchupCache[heroId]
+    let matchups = matchupData[heroId]
     if (!matchups){
-      matchups = await fetchMatchups(heroId);
+      console.warn(`No local data for heroId ${heroId}`);
+      return res.status(404).json({ error: "Matchup data not found" });
     }
 
     res.json({ message: "Hero selected",
@@ -148,7 +154,7 @@ app.post("/api/select-hero", async (req, res) => {
 });
 
 app.post("/api/synergy-picks", async (req, res) => {
-  const { allyHeroIds = [], enemyHeroIds = [], bannedHeroIds = [], matchups = {} } = req.body;
+  const { allyHeroIds = [], enemyHeroIds = [], bannedHeroIds = [] } = req.body;
   try {
     const allHeroes = await Hero.find({});
     const pickedSet = new Set([...allyHeroIds, ...enemyHeroIds, ...bannedHeroIds]);
@@ -158,7 +164,7 @@ app.post("/api/synergy-picks", async (req, res) => {
 
     // Synergy calculations
     for (const allyId of allyHeroIds) {
-      const allyMatchups = matchups[allyId]?.with || [];
+      const allyMatchups = matchupData[allyId]?.with || [];
       for (const { heroId2, synergy } of allyMatchups) {
         synergyScores[heroId2] = (synergyScores[heroId2] || 0) + synergy;
       }
@@ -166,7 +172,7 @@ app.post("/api/synergy-picks", async (req, res) => {
 
     // Counter calculations
     for (const enemyId of enemyHeroIds) {
-      const enemyMatchups = matchups[enemyId]?.vs || [];
+      const enemyMatchups = matchupData[enemyId]?.vs || [];
       for (const { heroId2, synergy } of enemyMatchups) {
         counterScores[heroId2] = (counterScores[heroId2] || 0) + synergy;
       }
@@ -208,5 +214,5 @@ app.post("/api/synergy-picks", async (req, res) => {
 // Start server
 const PORT = 3001;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server is now running!`);
 });
