@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const STRATZ_API_URL = 'https://api.stratz.com/graphql';
 
 async function fetchMatchups(heroId) {
@@ -28,7 +30,7 @@ async function fetchMatchups(heroId) {
       headers: {
         "Content-Type": "application/json",
         "User-Agent": "STRATZ_API",
-        Authorization: `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJTdWJqZWN0IjoiYzAyNzI3YTktZGYxNS00Yjg4LWEwMWEtOGUzM2U4ZmI4NGZkIiwiU3RlYW1JZCI6IjE3ODAwNzg0NiIsIm5iZiI6MTc1MTA3NDgyMCwiZXhwIjoxNzgyNjEwODIwLCJpYXQiOjE3NTEwNzQ4MjAsImlzcyI6Imh0dHBzOi8vYXBpLnN0cmF0ei5jb20ifQ.0MsuzymNg-DZbknEwZ5vPBYkqQEjMzIDp1qP_2KBXn8`, // token shortened
+        Authorization: `Bearer ${process.env.SRATZ_API_TOKEN}`,
       },
       body: JSON.stringify({ query: matchupQuery, variables }),
     });
