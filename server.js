@@ -215,10 +215,7 @@ app.post("/api/synergy-picks", async (req, res) => {
 
     // Counter calculations
     for (enemyId of enemyHeroIds) {
-      const id2 = hero.HeroId;
-      if (pickedSet.has(id2)) continue;
-
-      const enemyMatchups = matchupData[id2]?.vs || [];
+      const enemyMatchups = matchupData[enemyId]?.vs || [];
       for (const { heroId2, synergy } of enemyMatchups) {
         if (pickedSet.has(heroId2)) {
           counterScores[heroId2] = (counterScores[heroId2] || 0) + synergy;
