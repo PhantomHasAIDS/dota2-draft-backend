@@ -221,7 +221,7 @@ app.post("/api/synergy-picks", async (req, res) => {
       const matchups2 = matchupData[id2]?.vs || [];
       for (const { heroId3, synergy } of matchups2) {
         if (allyHeroIds.includes(heroId3)) {
-          synergyScores[id2] = (synergyScores[id2] || 0) + synergy;
+          counterScores[id2] = (synergyScores[id2] || 0) + synergy;
         }
       }
     }
