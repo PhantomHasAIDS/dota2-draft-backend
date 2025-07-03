@@ -154,27 +154,75 @@ app.post("/api/select-hero", async (req, res) => {
 });
 
 app.post("/api/synergy-picks", async (req, res) => {
-  const { allyHeroIds = [], enemyHeroIds = [], bannedHeroIds = [], roleFilter = null } = req.body;
+  const { allyHeroIds = [], enemyHeroIds = [], bannedHeroIds = [], roleFilter = null, fullDraft = false } = req.body;
   try {
     const allHeroes = await Hero.find({});
     const pickedSet = new Set([...allyHeroIds, ...enemyHeroIds, ...bannedHeroIds]);
+
+    if (fullDraft && allyHeroIds.length === 5 && enemyHeroIds.length === 5) {
+      const teamStats = { ally: [], enemy: [] };
+
+      for (const teamName of ["ally", "enemy"]) {
+        const teamIds = teamName === "ally" ? allyHeroIds : enemyHeroIds;
+        const matchupType = "with";
+        const opponentIds = teamName === "ally" ? enemyHeroIds : allyHeroIds;
+        const counterType = "vs";
+
+        for (const heroId of teamIds) {
+          const data = matchupData[heroId];
+          if (!data) continue;
+
+          // Internal synergy
+          const synergy = data[matchupType]
+            .filter(( {heroId2 }) => teamIds.includes(heroId2))
+            .reduce((sum, { synergy }) => sum + synergy, 0);
+
+          // External counter
+          const counter = data[counterType]
+            .filter(({ heroId2 }) => opponentIds.includes(heroId2))
+            .reduce((sum, { synergy }) => sum + synergy, 0);
+
+          const hero = allHeroes.find(h => h.HeroId === heroId);
+
+          teamStats[teamName].push({
+            HeroId: hero.HeroId,
+            name: hero.name,
+            icon_url: hero.icon_url,
+            synergyScore: synergy.toFixed(2),
+            counterScore: counter.toFixed(2),
+            totalScore: (synergy - counter).toFixed(2),
+          });
+        }
+      }
+      return res.json({ mode: "fullDraft", teamStats });
+    }
 
     const synergyScores = {};
     const counterScores = {};
 
     // Synergy calculations
-    for (const allyId of allyHeroIds) {
-      const allyMatchups = matchupData[allyId]?.with || [];
-      for (const { heroId2, synergy } of allyMatchups) {
-        synergyScores[heroId2] = (synergyScores[heroId2] || 0) + synergy;
+    for (const hero of allHeroes) {
+      const id = hero.HeroId;
+      if (pickedSet.has(id)) continue;
+
+      const matchups = matchupData[id]?.with || [];
+      for (const { heroId2, synergy } of matchups) {
+        if (allyHeroIds.includes(heroId2)) {
+          synergyScores[id] = (synergyScores[id] || 0) + synergy;
+        }
       }
     }
 
     // Counter calculations
-    for (const enemyId of enemyHeroIds) {
-      const enemyMatchups = matchupData[enemyId]?.vs || [];
-      for (const { heroId2, synergy } of enemyMatchups) {
-        counterScores[heroId2] = (counterScores[heroId2] || 0) + synergy;
+    for (const hero of allHeroes) {
+      const id2 = hero.HeroId;
+      if (pickedSet.has(id2)) continue;
+
+      const matchups2 = matchupData[id2]?.vs || [];
+      for (const { heroId3, synergy } of matchups2) {
+        if (allyHeroIds.includes(heroId3)) {
+          synergyScores[id2] = (synergyScores[id2] || 0) + synergy;
+        }
       }
     }
 
