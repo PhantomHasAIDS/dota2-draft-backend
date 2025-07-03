@@ -164,21 +164,19 @@ app.post("/api/synergy-picks", async (req, res) => {
 
       for (const teamName of ["ally", "enemy"]) {
         const teamIds = teamName === "ally" ? allyHeroIds : enemyHeroIds;
-        const matchupType = "with";
         const opponentIds = teamName === "ally" ? enemyHeroIds : allyHeroIds;
-        const counterType = "vs";
 
         for (const heroId of teamIds) {
           const data = matchupData[heroId];
           if (!data) continue;
 
           // Internal synergy
-          const synergy = data[matchupType]
+          const synergy = data.with
             .filter(( {heroId2 }) => teamIds.includes(heroId2))
             .reduce((sum, { synergy }) => sum + synergy, 0);
 
           // External counter
-          const counter = data[counterType]
+          const counter = data.vs
             .filter(({ heroId2 }) => opponentIds.includes(heroId2))
             .reduce((sum, { synergy }) => sum + synergy, 0);
 
@@ -190,7 +188,7 @@ app.post("/api/synergy-picks", async (req, res) => {
             icon_url: hero.icon_url,
             synergyScore: synergy.toFixed(2),
             counterScore: counter.toFixed(2),
-            totalScore: (synergy - counter).toFixed(2),
+            totalScore: (synergy + counter).toFixed(2),
           });
         }
       }
@@ -205,20 +203,20 @@ app.post("/api/synergy-picks", async (req, res) => {
       const id = hero.HeroId;
       if (pickedSet.has(id)) continue;
 
-      const matchups = matchupData[id]?.with || [];
-      for (const { heroId2, synergy } of matchups) {
+      const withSynergies = matchupData[id]?.with || [];
+      const vsSynergies = matchupData[id]?.vs || [];
+
+      // synergy with allies
+      for (const { heroId2, synergy } of withSynergies) {
         if (allyHeroIds.includes(heroId2)) {
           synergyScores[id] = (synergyScores[id] || 0) + synergy;
         }
       }
-    }
 
-    // Counter calculations
-    for (const enemyId of enemyHeroIds) {
-      const enemyMatchups = matchupData[enemyId]?.vs || [];
-      for (const { heroId2, synergy } of enemyMatchups) {
-        if (!pickedSet.has(heroId2)) {
-          counterScores[heroId2] = (counterScores[heroId2] || 0) - synergy;
+      // this hero vs enemy heroes (i.e. does he counter them?)
+      for (const { heroId2, synergy } of vsSynergies) {
+        if (enemyHeroIds.includes(heroId2)) {
+          counterScores[id] = (counterScores[id] || 0) + synergy;
         }
       }
     }
@@ -233,7 +231,7 @@ app.post("/api/synergy-picks", async (req, res) => {
 
       const synergy = synergyScores[id] || 0;
       const counter = counterScores[id] || 0;
-      const total = synergy - counter;
+      const total = synergy + counter;
 
       combinedScores[id] = {
         HeroId: hero.HeroId,
