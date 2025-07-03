@@ -194,7 +194,7 @@ app.post("/api/synergy-picks", async (req, res) => {
           });
         }
       }
-      return res.json({ mode: "fullDraft", teamStats });
+      return res.json({ mode: "fullDraft", teams: teamStats });
     }
 
     const synergyScores = {};
