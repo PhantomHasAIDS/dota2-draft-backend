@@ -220,7 +220,7 @@ app.post("/api/synergy-picks", async (req, res) => {
 
       const matchups2 = matchupData[id2]?.vs || [];
       for (const { heroId3, synergy } of matchups2) {
-        if (allyHeroIds.includes(heroId3)) {
+        if (enemyHeroIds.includes(heroId3)) {
           counterScores[id2] = (counterScores[id2] || 0) + synergy;
         }
       }
