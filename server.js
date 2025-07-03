@@ -214,14 +214,14 @@ app.post("/api/synergy-picks", async (req, res) => {
     }
 
     // Counter calculations
-    for (const hero of allHeroes) {
+    for (enemyId of enemyHeroIds) {
       const id2 = hero.HeroId;
       if (pickedSet.has(id2)) continue;
 
-      const matchups2 = matchupData[id2]?.vs || [];
-      for (const { heroId3, synergy } of matchups2) {
-        if (enemyHeroIds.includes(heroId3)) {
-          counterScores[id2] = (counterScores[id2] || 0) + synergy;
+      const enemyMatchups = matchupData[id2]?.vs || [];
+      for (const { heroId2, synergy } of enemyMatchups) {
+        if (pickedSet.has(heroId2)) {
+          counterScores[heroId2] = (counterScores[heroId2] || 0) + synergy;
         }
       }
     }
